@@ -284,7 +284,7 @@ async def main():
 	total_count = len(accounts)
 	notification_content = []
 	current_balances = {}
-	need_notify = True  # 是否需要发送通知
+	need_notify = False  # 是否需要发送通知
 	balance_changed = False  # 余额是否有变化
 
 	for i, account in enumerate(accounts):
@@ -356,30 +356,37 @@ async def main():
 	if current_balance_hash:
 		save_balance_hash(current_balance_hash)
 
-	if need_notify and notification_content:
-		# 构建通知内容
-		summary = [
-			'[STATS] Check-in result statistics:',
-			f'[SUCCESS] Success: {success_count}/{total_count}',
-			f'[FAIL] Failed: {total_count - success_count}/{total_count}',
-		]
+	# 构建通知内容
+	summary = [
+		'[STATS] Check-in result statistics:',
+		f'[SUCCESS] Success: {success_count}/{total_count}',
+		f'[FAIL] Failed: {total_count - success_count}/{total_count}',
+	]
 
-		if success_count == total_count:
-			summary.append('[SUCCESS] All accounts check-in successful!')
-		elif success_count > 0:
-			summary.append('[WARN] Some accounts check-in successful')
-		else:
-			summary.append('[ERROR] All accounts check-in failed')
-
-		time_info = f'[TIME] Execution time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
-
-		notify_content = '\n\n'.join([time_info, '\n'.join(notification_content), '\n'.join(summary)])
-
-		print(notify_content)
-		notify.push_message('AnyRouter Check-in Alert', notify_content, msg_type='text')
-		print('[NOTIFY] Notification sent due to failures or balance changes')
+	if success_count == total_count:
+		summary.append('[SUCCESS] All accounts check-in successful!')
+	elif success_count > 0:
+		summary.append('[WARN] Some accounts check-in successful')
 	else:
-		print('[INFO] All accounts successful and no balance changes detected, notification skipped')
+		summary.append('[ERROR] All accounts check-in failed')
+
+	time_info = f'[TIME] Execution time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+
+	# 如果没有特定通知内容，添加默认成功信息
+	if not notification_content:
+		for i, account in enumerate(accounts):
+			account_key = f'account_{i + 1}'
+			if account_key in current_balances:
+				account_name = account.get_display_name(i)
+				account_result = f'[SUCCESS] {account_name}'
+				account_result += f'\n:money: Current balance: ${current_balances[account_key]["quota"]}, Used: ${current_balances[account_key]["used"]}'
+				notification_content.append(account_result)
+
+	notify_content = '\n\n'.join([time_info, '\n'.join(notification_content), '\n'.join(summary)])
+
+	print(notify_content)
+	notify.push_message('AnyRouter Check-in Alert', notify_content, msg_type='text')
+	print('[NOTIFY] Notification sent')
 
 	# 设置退出码
 	sys.exit(0 if success_count > 0 else 1)
